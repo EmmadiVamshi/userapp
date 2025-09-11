@@ -4,13 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, TITLE_COLOR } from '../../constants/Colors';
 import { Layout } from '../../constants/Layout';
 import * as ImagePicker from 'expo-image-picker';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { userApi, UserProfileUpdate } from '../../services/userService';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditProfileScreen({ navigation, route }: any) {
   const params = route?.params || {};
   const { 
-    name: initialName = '', 
     email: initialEmail = '', 
     phone: initialPhone = '', 
     gender: initialGender = '', 
@@ -35,29 +35,109 @@ export default function EditProfileScreen({ navigation, route }: any) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
-  const { user } = useUser();
   const { getToken } = useAuth();
+  const { user } = useUser();
 
   const pickImage = async () => {
     try {
+      // Request permissions first
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert(
+          'Permission Required',
+          'Permission to access camera roll is required to upload photos.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.7, // Slightly higher quality for better results
+        base64: false, // Don't include base64 to reduce payload size
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         if (asset && asset.uri) {
+          // Validate image size (optional - you can adjust the limit)
+          if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) { // 5MB limit
+            Alert.alert(
+              'Image Too Large',
+              'Please select an image smaller than 5MB.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          
           setPhoto(asset.uri);
+          console.log('📷 Image selected:', {
+            uri: asset.uri.substring(0, 50) + '...',
+            width: asset.width,
+            height: asset.height,
+            fileSize: asset.fileSize ? `${Math.round(asset.fileSize / 1024)}KB` : 'Unknown'
+          });
         }
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      console.error('❌ Error picking image:', error);
+      Alert.alert(
+        'Error',
+        'Failed to pick image. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
+  };
+
+  const removePhoto = () => {
+    Alert.alert(
+      'Remove Photo',
+      'Are you sure you want to remove your profile photo?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setPhoto('');
+            console.log('📷 Profile photo removed');
+          },
+        },
+      ]
+    );
+  };
+
+  const onDateChange = (_event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      // Format date as YYYY-MM-DD for API
+      const formattedDate = selectedDate.toISOString().split('T')[0];
+      setDateOfBirth(formattedDate || '');
+    }
+  };
+
+  // Helper function to get user's phone number for comparison
+  const getUserPhoneNumber = () => {
+    // Try to get from user profile first, then from Clerk
+    if (phone && phone.trim()) {
+      return phone.trim();
+    }
+    // Fallback to Clerk user phone number
+    return user?.primaryPhoneNumber?.phoneNumber || '';
+  };
+
+  // Helper function to normalize phone numbers for comparison
+  const normalizePhoneNumber = (phoneNum: string) => {
+    // Remove all non-digit characters and country codes
+    return phoneNum.replace(/\D/g, '').replace(/^91/, '').replace(/^1/, '');
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -129,20 +209,20 @@ export default function EditProfileScreen({ navigation, route }: any) {
      
      if (!gender) newErrors.gender = 'Gender is required';
      
-     // Date of Birth validation
+     // Date of Birth validation (matching userService validation)
      if (dateOfBirth.trim()) {
        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
        if (!dateRegex.test(dateOfBirth)) {
          newErrors.dateOfBirth = 'Date must be in YYYY-MM-DD format';
        } else {
-         const date = new Date(dateOfBirth);
-         const currentDate = new Date();
-         if (isNaN(date.getTime())) {
+         const dob = new Date(dateOfBirth);
+         const today = new Date();
+         const age = today.getFullYear() - dob.getFullYear();
+         
+         if (isNaN(dob.getTime())) {
            newErrors.dateOfBirth = 'Invalid date';
-         } else if (date > currentDate) {
-           newErrors.dateOfBirth = 'Date cannot be in the future';
-         } else if (date.getFullYear() < 1900) {
-           newErrors.dateOfBirth = 'Date cannot be before 1900';
+         } else if (age < 18 || age > 100) {
+           newErrors.dateOfBirth = 'Age must be between 18 and 100 years';
          }
        }
      }
@@ -152,6 +232,16 @@ export default function EditProfileScreen({ navigation, route }: any) {
      
      if (!emergencyPhone.trim()) newErrors.emergencyPhone = 'Emergency phone is required';
      else if (!/^[0-9]{10}$/.test(emergencyPhone.replace(/\D/g, ''))) newErrors.emergencyPhone = 'Emergency phone must be 10 digits';
+     else {
+       // Check if emergency contact phone matches user's phone number
+       const userPhone = getUserPhoneNumber();
+       const normalizedUserPhone = normalizePhoneNumber(userPhone);
+       const normalizedEmergencyPhone = normalizePhoneNumber(emergencyPhone);
+       
+       if (normalizedUserPhone && normalizedEmergencyPhone && normalizedUserPhone === normalizedEmergencyPhone) {
+         newErrors.emergencyPhone = 'Emergency contact phone cannot be the same as your phone number. Please provide a different number.';
+       }
+     }
      
      setErrors(newErrors);
      return Object.keys(newErrors).length === 0;
@@ -179,12 +269,16 @@ export default function EditProfileScreen({ navigation, route }: any) {
         preferredLanguage,
       };
 
+      // Log the data being sent for debugging
+      console.log('📤 Sending profile update data:', {
+        ...updateData,
+        profilePhoto: photo ? `${photo.substring(0, 50)}...` : 'No photo'
+      });
+
       // Update user profile
       const updatedProfile = await userApi.updateUserProfile(updateData, getToken);
       
       console.log('✅ Profile updated successfully:', updatedProfile);
-      
-
       
       Alert.alert(
         'Success! 🎉',
@@ -217,30 +311,54 @@ export default function EditProfileScreen({ navigation, route }: any) {
         ]
       );
       
-         } catch (error) {
-       console.error('Error updating profile:', error);
-       
-       // Provide more specific error messages
-       let errorMessage = 'Failed to update profile. Please try again.';
-       
-       if (error instanceof Error) {
-         if (error.message.includes('500')) {
-           errorMessage = 'Server error. Please check your data and try again.';
-         } else if (error.message.includes('400')) {
-           errorMessage = 'Invalid data. Please check your information and try again.';
-         } else if (error.message.includes('401')) {
-           errorMessage = 'Authentication error. Please log in again.';
-         } else if (error.message.includes('403')) {
-           errorMessage = 'Access denied. Please check your permissions.';
-         } else if (error.message.includes('404')) {
-           errorMessage = 'Profile not found. Please contact support.';
-         }
-       }
-       
-       Alert.alert('Error', errorMessage);
-     } finally {
-       setIsSaving(false);
-     }
+    } catch (error) {
+      console.error('❌ Error updating profile:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to update profile. Please try again.';
+      let errorTitle = 'Error';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('500')) {
+          errorTitle = 'Server Error';
+          errorMessage = 'The server is experiencing issues. This might be due to:\n\n• Image upload problems\n• Server maintenance\n• Database connectivity issues\n\nPlease try again in a few minutes or contact support if the problem persists.';
+        } else if (error.message.includes('400')) {
+          errorTitle = 'Invalid Data';
+          errorMessage = 'Please check your information and try again. Make sure all required fields are filled correctly.';
+        } else if (error.message.includes('401')) {
+          errorTitle = 'Authentication Error';
+          errorMessage = 'Your session has expired. Please log in again.';
+        } else if (error.message.includes('403')) {
+          errorTitle = 'Access Denied';
+          errorMessage = 'You don\'t have permission to update this profile. Please contact support.';
+        } else if (error.message.includes('404')) {
+          errorTitle = 'Profile Not Found';
+          errorMessage = 'Your profile could not be found. Please contact support.';
+        } else if (error.message.includes('timeout')) {
+          errorTitle = 'Request Timeout';
+          errorMessage = 'The request took too long to complete. Please check your internet connection and try again.';
+        } else if (error.message.includes('network')) {
+          errorTitle = 'Network Error';
+          errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+        }
+      }
+      
+      Alert.alert(errorTitle, errorMessage, [
+        {
+          text: 'Try Again',
+          onPress: () => {
+            // Allow user to retry
+            handleSave();
+          }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -264,14 +382,29 @@ export default function EditProfileScreen({ navigation, route }: any) {
           keyboardShouldPersistTaps="handled"
         >
           {/* Upload Photo */}
-          <TouchableOpacity style={styles.photoContainer} onPress={pickImage} accessibilityLabel="Upload Photo">
-            {photo ? (
-              <Image source={{ uri: photo }} style={styles.photo} />
-            ) : (
-              <Ionicons name="camera" size={40} color={Colors.gray400} />
+          <View style={styles.photoContainer}>
+            <TouchableOpacity style={styles.photoUploadArea} onPress={pickImage} accessibilityLabel="Upload Photo">
+              {photo ? (
+                <Image source={{ uri: photo }} style={styles.photo} />
+              ) : (
+                <Ionicons name="camera" size={40} color={Colors.gray400} />
+              )}
+              <Text style={styles.uploadText}>
+                {photo ? 'Change Photo' : 'Upload Photo'}
+              </Text>
+            </TouchableOpacity>
+            
+            {photo && (
+              <TouchableOpacity 
+                style={styles.removePhotoButton} 
+                onPress={removePhoto}
+                accessibilityLabel="Remove Photo"
+              >
+                <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                <Text style={styles.removePhotoText}>Remove</Text>
+              </TouchableOpacity>
             )}
-            <Text style={styles.uploadText}>Upload Photo</Text>
-          </TouchableOpacity>
+          </View>
                      {/* First Name */}
            <Text style={styles.label}>First Name</Text>
            <TextInput
@@ -314,45 +447,45 @@ export default function EditProfileScreen({ navigation, route }: any) {
           
                                  {/* Date of Birth */}
             <Text style={styles.label}>Date of Birth</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={dateOfBirth}
-              onChangeText={(value) => handleFieldChange('dateOfBirth', value)}
-            />
+            <TouchableOpacity 
+              style={styles.input} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={[
+                styles.dateText, 
+                !dateOfBirth && styles.placeholderText
+              ]}>
+                {dateOfBirth ? new Date(dateOfBirth).toLocaleDateString() : 'Select your date of birth'}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color={Colors.gray400} style={styles.calendarIcon} />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={dateOfBirth ? new Date(dateOfBirth) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onDateChange}
+                maximumDate={new Date()}
+                minimumDate={new Date(1900, 0, 1)}
+              />
+            )}
             {errors.dateOfBirth && <Text style={{ color: Colors.error }}>{errors.dateOfBirth}</Text>}
            
                        {/* Gender */}
-            <Text style={styles.label}>
-              Gender 
-              {gender && gender.trim() !== '' && (
-                <Text style={{ color: Colors.gray500, fontSize: 12 }}> (Not Editable)</Text>
-              )}
-            </Text>
+            <Text style={styles.label}>Gender</Text>
             <View style={styles.genderRow}>
               {['Male', 'Female', 'Other'].map((g) => (
                 <TouchableOpacity
                   key={g}
                   style={[
                     styles.genderButton, 
-                    gender === g && styles.genderButtonSelected,
-                    gender && gender.trim() !== '' && gender !== g && styles.genderButtonDisabled
+                    gender === g && styles.genderButtonSelected
                   ]}
-                  onPress={() => {
-                    if (!gender || gender.trim() === '') {
-                      // Allow editing if gender is not set
-                      setGender(g);
-                    } else {
-                      // Gender field is disabled if already set
-                      console.log('Gender field is not editable - already set');
-                    }
-                  }}
-                                     disabled={Boolean(gender && gender.trim() !== '')}
+                  onPress={() => setGender(g)}
                 >
                   <Text style={[
                     styles.genderText, 
-                    gender === g && styles.genderTextSelected,
-                    gender && gender.trim() !== '' && gender !== g && styles.genderTextDisabled
+                    gender === g && styles.genderTextSelected
                   ]}>{g}</Text>
                 </TouchableOpacity>
               ))}
@@ -430,6 +563,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Layout.spacing.lg,
   },
+  photoUploadArea: {
+    alignItems: 'center',
+    marginBottom: Layout.spacing.sm,
+  },
   photo: {
     width: 80,
     height: 80,
@@ -440,7 +577,22 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: Layout.fontSize.sm,
     marginTop: 4,
-    marginBottom: 8,
+  },
+  removePhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.gray100,
+    paddingHorizontal: Layout.spacing.md,
+    paddingVertical: Layout.spacing.sm,
+    borderRadius: Layout.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  removePhotoText: {
+    color: Colors.error,
+    fontSize: Layout.fontSize.sm,
+    marginLeft: Layout.spacing.xs,
+    fontWeight: '500',
   },
   label: {
     fontSize: Layout.fontSize.md,
@@ -457,6 +609,9 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   disabledInput: {
     backgroundColor: Colors.gray100,
@@ -485,13 +640,6 @@ const styles = StyleSheet.create({
   genderTextSelected: {
     color: Colors.white,
     fontWeight: 'bold',
-  },
-  genderButtonDisabled: {
-    backgroundColor: Colors.gray200,
-    opacity: 0.6,
-  },
-  genderTextDisabled: {
-    color: Colors.gray500,
   },
   saveButton: {
     backgroundColor: Colors.primary,
@@ -522,5 +670,16 @@ const styles = StyleSheet.create({
     marginTop: Layout.spacing.md,
     fontSize: Layout.fontSize.md,
     color: Colors.textSecondary,
+  },
+  dateText: {
+    fontSize: Layout.fontSize.md,
+    color: Colors.text,
+    flex: 1,
+  },
+  placeholderText: {
+    color: Colors.gray400,
+  },
+  calendarIcon: {
+    marginLeft: Layout.spacing.sm,
   },
 }); 
