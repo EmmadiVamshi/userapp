@@ -32,6 +32,7 @@ interface NameStepProps {
   setFirstName: (v: string) => void;
   setLastName: (v: string) => void;
   onNext: () => void;
+  onSignIn: () => void;
 }
 
 interface PhoneStepProps {
@@ -41,6 +42,7 @@ interface PhoneStepProps {
   isLoading: boolean;
   selectedCountry: CountryItem;
   phoneError?: string;
+  onSignIn: () => void;
 }
 
 interface OtpStepProps {
@@ -70,7 +72,7 @@ function isAlphaSpace(str: string) {
 }
 
 // Step 1: Name Entry
-function NameStep({ firstName, lastName, setFirstName, setLastName, onNext }: NameStepProps) {
+function NameStep({ firstName, lastName, setFirstName, setLastName, onNext, onSignIn }: NameStepProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -179,6 +181,18 @@ function NameStep({ firstName, lastName, setFirstName, setLastName, onNext }: Na
           style={styles.nextButton}
           hapticFeedback={true}
         />
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity style={styles.signInButton} onPress={onSignIn}>
+          <Text style={styles.signInText}>
+            Already have an account? <Text style={styles.signInLink}>Sign In</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -191,7 +205,8 @@ function PhoneStep({
   onNext, 
   isLoading,
   selectedCountry,
-  phoneError
+  phoneError,
+  onSignIn
 }: PhoneStepProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -279,6 +294,18 @@ function PhoneStep({
           style={styles.nextButton}
           hapticFeedback={true}
         />
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity style={styles.signInButton} onPress={onSignIn}>
+          <Text style={styles.signInText}>
+            Already have an account? <Text style={styles.signInLink}>Sign In</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -668,7 +695,7 @@ function CompleteStep({
 }
 
 // Main SignUp Screen Component
-export default function SignUpScreen() {
+export default function SignUpScreen({ navigation }: any) {
   const [step, setStep] = useState<number>(1);
   const [firstName, setFirstName] = useState<string>('');
   const [lastName, setLastName] = useState<string>('');
@@ -741,6 +768,14 @@ export default function SignUpScreen() {
     setOtp(['', '', '', '', '', '']); // Clear OTP
     setOtpError(''); // Clear any OTP errors
     goToPrevStep(); // Go back to phone step
+  };
+
+  // Handle navigation to Sign In
+  const handleSignIn = () => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    navigation.replace('Login');
   };
 
 
@@ -1069,6 +1104,7 @@ export default function SignUpScreen() {
                     setFirstName={setFirstName}
                     setLastName={setLastName}
                     onNext={goToNextStep}
+                    onSignIn={handleSignIn}
                   />
                 )}
                 
@@ -1080,6 +1116,7 @@ export default function SignUpScreen() {
                     isLoading={isLoading}
                     selectedCountry={selectedCountry}
                     phoneError={phoneError}
+                    onSignIn={handleSignIn}
                   />
                 )}
                 
@@ -1228,6 +1265,33 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     marginTop: Layout.spacing.lg,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Layout.spacing.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    marginHorizontal: Layout.spacing.md,
+    fontSize: Layout.fontSize.sm,
+    color: Colors.textSecondary,
+  },
+  signInButton: {
+    alignItems: 'center',
+    paddingVertical: Layout.spacing.md,
+  },
+  signInText: {
+    fontSize: Layout.fontSize.md,
+    color: Colors.textSecondary,
+  },
+  signInLink: {
+    color: Colors.primary,
+    fontWeight: '600',
   },
   // OTP specific styles
   otpContainer: {
