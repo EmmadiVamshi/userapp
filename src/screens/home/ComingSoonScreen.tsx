@@ -191,14 +191,6 @@ export default function ComingSoonScreen({ navigation }: any) {
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-              <Text style={styles.primaryButtonText}>Go Back</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
               style={styles.secondaryButton}
               onPress={() => navigation.navigate('HelpSupport')}
             >
@@ -407,27 +399,6 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
     alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: Colors.white,
-    paddingVertical: Layout.spacing.lg,
-    paddingHorizontal: Layout.spacing.xl,
-    borderRadius: 16,
-    marginBottom: Layout.spacing.md,
-    minWidth: 220,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  primaryButtonText: {
-    fontSize: Layout.fontSize.lg,
-    fontWeight: 'bold',
-    color: Colors.primary,
   },
   secondaryButton: {
     flexDirection: 'row',
