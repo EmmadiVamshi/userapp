@@ -7,13 +7,12 @@ import {
   ScrollView,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { Layout } from '../../constants/Layout';
-import { useUser } from '@clerk/clerk-expo';
-import { logger } from '../../utils/logger';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../i18n/LanguageContext';
 import NotificationPreferencesService, { NotificationPreferences } from '../../services/notificationPreferencesService';
@@ -21,15 +20,17 @@ import NotificationService from '../../services/notificationService';
 import { showRatingPrompt } from '../../utils/appRating';
 
 export default function SettingsScreen({ navigation }: any) {
-  const { user } = useUser();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguage();
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     pushNotifications: true,
     locationServices: true,
+    autoPayment: false,
+    shareData: false,
     lastUpdated: Date.now(),
   });
   const [loading, setLoading] = useState(true);
+  const [showTerms, setShowTerms] = useState(false);
 
   const preferencesService = NotificationPreferencesService.getInstance();
   const notificationService = NotificationService.getInstance();
@@ -83,28 +84,6 @@ export default function SettingsScreen({ navigation }: any) {
     }
   };
 
-  const getUserName = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName} ${user.lastName}`;
-    } else if (user?.firstName) {
-      return user.firstName;
-    } else if (user?.fullName) {
-      return user.fullName;
-    }
-    return 'User';
-  };
-
-  const getUserEmail = () => {
-    return user?.primaryEmailAddress?.emailAddress || '';
-  };
-
-  const getUserPhone = () => {
-    return user?.primaryPhoneNumber?.phoneNumber || '';
-  };
-
-  const getUserPhoto = () => {
-    return user?.imageUrl || '';
-  };
 
   const getCurrentLanguageName = () => {
     const languageMap: { [key: string]: string } = {
@@ -115,6 +94,14 @@ export default function SettingsScreen({ navigation }: any) {
       'ar': 'العربية'
     };
     return languageMap[currentLanguage] || currentLanguage.toUpperCase();
+  };
+
+  const handleContactSupport = () => {
+    Linking.openURL('mailto:info@camelq.in');
+  };
+
+  const handleViewFullPolicy = () => {
+    Linking.openURL('https://privacy-policy-dev.up.railway.app/');
   };
 
   const settingSections = [
@@ -155,13 +142,7 @@ export default function SettingsScreen({ navigation }: any) {
           icon: 'document-text-outline',
           title: t('common.termsOfService'),
           subtitle: t('common.readTermsAndConditions'),
-          action: () => logger.debug('Terms'),
-        },
-        {
-          icon: 'share-outline',
-          title: t('common.dataSharing'),
-          subtitle: t('common.controlDataSharing'),
-          action: () => logger.debug('Data Sharing'),
+          action: () => setShowTerms(!showTerms),
         },
       ],
     },
@@ -241,6 +222,109 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
           </View>
         ))}
+
+        {/* Terms of Service Content */}
+        {showTerms && (
+          <View style={styles.termsSection}>
+            <Text style={styles.termsSectionTitle}>Terms of Service</Text>
+            <View style={styles.termsCard}>
+              <Text style={styles.termsLastUpdated}>Last Updated: January 2025</Text>
+              
+              <Text style={styles.termsIntroText}>
+                Welcome to Roqet Bike Taxi. These Terms of Service ("Terms") govern your use of our mobile application and services. By using our app, you agree to be bound by these Terms.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>1. Acceptance of Terms</Text>
+              <Text style={styles.termsText}>
+                By downloading, installing, or using the Roqet Bike Taxi app, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree to these terms, please do not use our services.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>2. Service Description</Text>
+              <Text style={styles.termsText}>
+                Roqet Bike Taxi is a transportation service that connects riders with drivers for bike taxi services. We provide a platform for booking rides, processing payments, and facilitating transportation services.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>3. User Eligibility</Text>
+              <Text style={styles.termsText}>
+                • You must be at least 18 years old to use our services{'\n'}
+                • You must provide accurate and complete information during registration{'\n'}
+                • You must have a valid payment method on file{'\n'}
+                • You must comply with all applicable laws and regulations
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>4. Account Registration</Text>
+              <Text style={styles.termsText}>
+                • You are responsible for maintaining the confidentiality of your account{'\n'}
+                • You must provide accurate, current, and complete information{'\n'}
+                • You are responsible for all activities that occur under your account{'\n'}
+                • You must notify us immediately of any unauthorized use of your account
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>5. Use of Services</Text>
+              <Text style={styles.termsText}>
+                You agree to use our services only for lawful purposes and in accordance with these Terms. You agree not to:{'\n'}
+                • Use the service for any illegal or unauthorized purpose{'\n'}
+                • Interfere with or disrupt the service or servers{'\n'}
+                • Attempt to gain unauthorized access to any part of the service{'\n'}
+                • Use the service to harass, abuse, or harm others{'\n'}
+                • Violate any applicable laws or regulations
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>6. Location Services</Text>
+              <Text style={styles.termsText}>
+                Our app requires access to your location to provide ride matching and navigation services. By using our app, you consent to the collection and use of your location data as described in our Privacy Policy.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>7. Payment Terms</Text>
+              <Text style={styles.termsText}>
+                • All payments are processed securely through Razorpay{'\n'}
+                • Fares are calculated based on distance, time, and applicable rates{'\n'}
+                • You are responsible for all charges incurred under your account{'\n'}
+                • We reserve the right to change our pricing at any time{'\n'}
+                • Refunds are subject to our refund policy
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>8. Safety and Conduct</Text>
+              <Text style={styles.termsText}>
+                • You must treat drivers and other users with respect{'\n'}
+                • You are responsible for your own safety during rides{'\n'}
+                • Report any safety concerns immediately{'\n'}
+                • Follow all applicable traffic laws and regulations{'\n'}
+                • Do not engage in any behavior that could endanger others
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>9. Privacy and Data Protection</Text>
+              <Text style={styles.termsText}>
+                Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your information. By using our services, you consent to the collection and use of your data as described in our Privacy Policy.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>10. Contact Information</Text>
+              <Text style={styles.termsText}>
+                If you have any questions about these Terms of Service, please contact us:{'\n\n'}
+                <Text style={styles.contactInfo}>
+                  Email: info@camelq.in{'\n'}
+                  Phone: 040-276126{'\n'}
+                  Address: CamelQ Software Solutions{'\n'}
+                  2nd Floor, Uptown Cyberabad Building{'\n'}
+                  100 ft Road, Madhapur{'\n'}
+                  Hyderabad, Telangana, India
+                </Text>
+              </Text>
+
+              <View style={styles.termsButtonContainer}>
+                <TouchableOpacity style={styles.termsContactButton} onPress={handleContactSupport}>
+                  <Ionicons name="mail-outline" size={20} color={Colors.white} />
+                  <Text style={styles.termsButtonText}>Contact Support</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.termsPrivacyButton} onPress={handleViewFullPolicy}>
+                  <Ionicons name="shield-outline" size={20} color={Colors.primary} />
+                  <Text style={styles.termsPrivacyButtonText}>View Privacy Policy</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
 
         {/* Bottom Margin */}
@@ -362,5 +446,90 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: Layout.fontSize.md,
     color: Colors.textSecondary,
+  },
+  // Terms of Service Styles
+  termsSection: {
+    marginTop: Layout.spacing.lg,
+  },
+  termsSectionTitle: {
+    fontSize: Layout.fontSize.lg,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: Layout.spacing.sm,
+    marginHorizontal: Layout.spacing.lg,
+  },
+  termsCard: {
+    backgroundColor: Colors.white,
+    marginHorizontal: Layout.spacing.lg,
+    borderRadius: Layout.borderRadius.lg,
+    padding: Layout.spacing.lg,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  termsLastUpdated: {
+    fontSize: Layout.fontSize.sm,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: Layout.spacing.md,
+    textAlign: 'center',
+  },
+  termsIntroText: {
+    fontSize: Layout.fontSize.md,
+    color: Colors.text,
+    lineHeight: 22,
+    marginBottom: Layout.spacing.lg,
+    textAlign: 'justify',
+  },
+  termsText: {
+    fontSize: Layout.fontSize.md,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: Layout.spacing.md,
+    textAlign: 'justify',
+  },
+  contactInfo: {
+    fontSize: Layout.fontSize.md,
+    color: Colors.text,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  termsButtonContainer: {
+    marginTop: Layout.spacing.xl,
+    gap: Layout.spacing.md,
+  },
+  termsContactButton: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Layout.spacing.md,
+    paddingHorizontal: Layout.spacing.lg,
+    borderRadius: Layout.borderRadius.md,
+    gap: Layout.spacing.sm,
+  },
+  termsButtonText: {
+    color: Colors.white,
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
+  },
+  termsPrivacyButton: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Layout.spacing.md,
+    paddingHorizontal: Layout.spacing.lg,
+    borderRadius: Layout.borderRadius.md,
+    gap: Layout.spacing.sm,
+  },
+  termsPrivacyButtonText: {
+    color: Colors.primary,
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
   },
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, TITLE_COLOR } from '../../constants/Colors';
+import { Colors } from '../../constants/Colors';
 import { Layout } from '../../constants/Layout';
 
 // Try to import LinearGradient, fallback to View if not available
@@ -188,16 +188,6 @@ export default function ComingSoonScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.secondaryButton}
-              onPress={() => navigation.navigate('HelpSupport')}
-            >
-              <Ionicons name="notifications" size={20} color={Colors.white} />
-              <Text style={styles.secondaryButtonText}>Get Notified</Text>
-            </TouchableOpacity>
-          </View>
         </Animated.View>
 
         {/* Floating Elements */}
@@ -394,26 +384,6 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.md,
     color: Colors.white,
     flex: 1,
-    fontWeight: '500',
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Layout.spacing.md,
-    paddingHorizontal: Layout.spacing.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  secondaryButtonText: {
-    fontSize: Layout.fontSize.md,
-    color: Colors.white,
-    marginLeft: Layout.spacing.sm,
     fontWeight: '500',
   },
   floatingElement1: {
