@@ -201,18 +201,37 @@ function OTPInputInternal({
         triggerShakeAnimation();
         return;
       }
+      
       // Handle paste operation - extract digits only (allowed when not manualOnly)
       const digits = inputValue.replace(/\D/g, '').split('');
       if (digits.length === 0) {
         triggerShakeAnimation();
         return;
       }
-      for (let i = 0; i < Math.min(digits.length, length - index); i++) {
-        newOtp[index + i] = digits[i];
+      
+      // If pasting a complete OTP (6 digits), start from the beginning
+      if (digits.length === length) {
+        for (let i = 0; i < length; i++) {
+          newOtp[i] = digits[i];
+        }
+        // Focus the last input
+        inputRefs.current[length - 1]?.focus();
+      } else {
+        // Fill available positions starting from current index
+        for (let i = 0; i < Math.min(digits.length, length - index); i++) {
+          newOtp[index + i] = digits[i];
+        }
+        
+        // Focus the next empty input or the last filled input
+        const nextEmptyIndex = newOtp.findIndex(digit => !digit);
+        const focusIndex = nextEmptyIndex >= 0 ? nextEmptyIndex : length - 1;
+        inputRefs.current[focusIndex]?.focus();
       }
-      const nextEmptyIndex = newOtp.findIndex(digit => !digit);
-      const focusIndex = nextEmptyIndex >= 0 ? nextEmptyIndex : length - 1;
-      inputRefs.current[focusIndex]?.focus();
+      
+      // Trigger success animation if all digits are filled
+      if (newOtp.every(digit => digit !== '')) {
+        triggerSuccessAnimation();
+      }
     }
     
     onChange(newOtp);
@@ -308,15 +327,18 @@ function OTPInputInternal({
   };
 
   const handleInputFocus = useCallback((index: number) => {
-    // Enforce sequential entry: always focus the first empty index
+    // Allow focusing on any input, but prefer the first empty one if all are empty
     const firstEmptyIndex = value.findIndex(digit => !digit);
-    const targetIndex = firstEmptyIndex >= 0 ? firstEmptyIndex : length - 1;
-    if (index !== targetIndex) {
+    const targetIndex = firstEmptyIndex >= 0 ? firstEmptyIndex : index;
+    
+    // Only redirect if we're trying to focus on a filled input when there are empty ones before it
+    if (index !== targetIndex && value[index] && firstEmptyIndex >= 0) {
       inputRefs.current[targetIndex]?.focus();
       return;
     }
+    
     // Highlight the focused input
-    inputRefs.current[targetIndex]?.setNativeProps({
+    inputRefs.current[index]?.setNativeProps({
       style: { borderColor: Colors.primary, borderWidth: 2 }
     });
   }, [value, length]);
