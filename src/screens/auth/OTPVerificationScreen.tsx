@@ -23,6 +23,7 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
   const { phoneNumber, isSignIn } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
@@ -64,6 +65,7 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
   }, []);
 
   const handleOtpChange = (value: string[]) => {
+    console.log('OTPVerificationScreen - OTP changed:', value);
     setOtp(value);
     // Clear error when user starts typing
     if (error) {
@@ -84,7 +86,7 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
     // Move focus back to the first input
     setTimeout(() => {
       otpRef.current?.focusIndex(0);
-    }, 50);
+    }, 100);
   };
 
   const handleVerifyOTP = async () => {
@@ -250,39 +252,77 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
   };
 
   const handleResendOTP = async () => {
+    if (isResending) return; // Prevent multiple clicks
+    
+    console.log('OTPVerificationScreen - Resending OTP...');
+    console.log('OTPVerificationScreen - isSignIn:', isSignIn);
+    console.log('OTPVerificationScreen - signIn object:', signIn);
+    console.log('OTPVerificationScreen - signUp object:', signUp);
+    
+    setIsResending(true);
+    
     try {
       if (isSignIn) {
         // For sign in, we need to prepare the phone number verification again
-        if (signIn) {
-          const { supportedFirstFactors } = await signIn.create({
-            identifier: phoneNumber,
+        if (!signIn) {
+          console.error('OTPVerificationScreen - SignIn object is null during resend');
+          Alert.alert('Error', 'Authentication service not available. Please try again.');
+          return;
+        }
+        
+        console.log('OTPVerificationScreen - Preparing sign in factor...');
+        // Get the supported factors first
+        const { supportedFirstFactors } = await signIn.create({
+          identifier: phoneNumber,
+        });
+        
+        const phoneNumberFactor = supportedFirstFactors?.find((factor: any) => {
+          return factor.strategy === 'phone_code';
+        }) as any;
+        
+        if (phoneNumberFactor) {
+          await signIn.prepareFirstFactor({
+            strategy: 'phone_code',
+            phoneNumberId: phoneNumberFactor.phoneNumberId,
           });
-          const phoneNumberFactor = supportedFirstFactors?.find((factor: any) => {
-            return factor.strategy === 'phone_code';
-          }) as any;
-          if (phoneNumberFactor) {
-            await signIn.prepareFirstFactor({
-              strategy: 'phone_code',
-              phoneNumberId: phoneNumberFactor.phoneNumberId,
-            });
-          }
+          console.log('OTPVerificationScreen - Sign in factor prepared successfully');
+        } else {
+          throw new Error('Phone number factor not found');
         }
       } else {
         // For sign up, prepare phone number verification
-        if (signUp) {
-          await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
+        if (!signUp) {
+          console.error('OTPVerificationScreen - SignUp object is null during resend');
+          Alert.alert('Error', 'Authentication service not available. Please try again.');
+          return;
         }
+        
+        console.log('OTPVerificationScreen - Preparing sign up phone verification...');
+        await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
+        console.log('OTPVerificationScreen - Sign up phone verification prepared successfully');
       }
       
+      console.log('OTPVerificationScreen - OTP resend successful, clearing state...');
       setTimer(30);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       setError('');
       setAttempts(0);
       
+      // Reset focus to first input after clearing OTP
+      setTimeout(() => {
+        console.log('OTPVerificationScreen - Resetting focus to first input');
+        otpRef.current?.focusIndex(0);
+      }, 100);
+      
       Alert.alert('Success', 'OTP sent successfully');
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      console.error('OTPVerificationScreen - Error resending OTP:', err);
+      console.error('OTPVerificationScreen - Error details:', err.errors || err.message || err);
+      const errorMessage = err.errors?.[0]?.message || err.message || 'Failed to resend OTP. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -340,8 +380,10 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
 
             <View style={styles.resendContainer}>
               {canResend ? (
-                <TouchableOpacity onPress={handleResendOTP} disabled={isLoading}>
-                  <Text style={styles.resendText}>Resend OTP</Text>
+                <TouchableOpacity onPress={handleResendOTP} disabled={isLoading || isResending}>
+                  <Text style={[styles.resendText, (isLoading || isResending) && styles.resendTextDisabled]}>
+                    {isResending ? 'Sending...' : 'Resend OTP'}
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.timerText}>
@@ -482,6 +524,10 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.md,
     color: Colors.primary,
     fontWeight: '600',
+  },
+  resendTextDisabled: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
   },
   timerText: {
     fontSize: Layout.fontSize.md,
